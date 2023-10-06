@@ -22,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
 
     private MessageAdapter mAdapter = new MessageAdapter(mList);
 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,20 +54,22 @@ public class MainActivity extends AppCompatActivity {
     public void insert(final WithMillis<Message> message) {
         mList.add(message);
         mAdapter.notifyItemInserted(mList.size() - 1);
-
-        // TODO: Start processing the message (please use CipherUtil#encrypt(...)) here.
-        //       After it has been processed, send it to the #update(...) method.
-
-        // How it should look for the end user? Uncomment if you want to see. Please note that
-        // you should not use poor decor view to send messages to UI thread.
-//        getWindow().getDecorView().postDelayed(new Runnable() {
-//            @Override
-//            public void run() {
-//                final Message messageNew = message.value.copy("sample :)");
-//                final WithMillis<Message> messageNewWithMillis = new WithMillis<>(messageNew, CipherUtil.WORK_MILLIS);
-//                update(messageNewWithMillis);
-//            }
-//        }, CipherUtil.WORK_MILLIS);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                long timestamp = System.currentTimeMillis();
+                final String cipherText = CipherUtil.encrypt(message.value.plainText);
+                long diff = System.currentTimeMillis() - timestamp;
+                final Message messageNew = message.value.copy(cipherText);
+                final WithMillis<Message> messageNewWithMillis = new WithMillis<>(messageNew, diff);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        update(messageNewWithMillis);
+                    }
+                });
+            }
+        }).start();
     }
 
     @UiThread

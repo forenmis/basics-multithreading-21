@@ -1,11 +1,12 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 28
+    compileSdk 32
+
     defaultConfig {
         applicationId "com.artemchep.basics_multithreading"
-        minSdkVersion 21
-        targetSdkVersion 28
+        minSdk 21
+        targetSdk 32
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -16,6 +17,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+    namespace 'com.artemchep.basics_multithreading'
 }
 
 dependencies {
