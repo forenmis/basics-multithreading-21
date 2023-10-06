@@ -16,7 +16,9 @@ import com.artemchep.basics_multithreading.domain.Message;
 import com.artemchep.basics_multithreading.domain.WithMillis;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -30,13 +32,13 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        looperThread.start();
-
         final RecyclerView recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(mAdapter);
 
         showWelcomeDialog();
+
+        looperThread.start();
     }
 
     @Override
@@ -64,12 +66,11 @@ public class MainActivity extends AppCompatActivity {
     public void insert(final WithMillis<Message> message) {
         mList.add(message);
         mAdapter.notifyItemInserted(mList.size() - 1);
-        looperThread.handler.post(new Runnable() {
+        long timestamp = System.currentTimeMillis();
+        looperThread.queue(new Runnable() {
             @Override
             public void run() {
-                synchronized (MainActivity.this) {
                     if (looperThread.isQuit()) return;
-                    long timestamp = System.currentTimeMillis();
                     final String cipherText = CipherUtil.encrypt(message.value.plainText);
                     long diff = System.currentTimeMillis() - timestamp;
                     final Message messageNew = message.value.copy(cipherText);
@@ -80,7 +81,6 @@ public class MainActivity extends AppCompatActivity {
                             update(messageNewWithMillis);
                         }
                     });
-                }
             }
         });
     }
@@ -102,13 +102,31 @@ public class MainActivity extends AppCompatActivity {
         public Handler handler;
         private Looper looper;
         private boolean quit;
+        private Queue<Runnable> queue = new LinkedList();
+
 
         @Override
         public void run() {
             Looper.prepare();
             looper = Looper.myLooper();
             handler = new Handler(looper);
+            checkQueue();
             Looper.loop();
+        }
+
+        public void queue(Runnable runnable) {
+            if (handler != null) {
+                handler.post(runnable);
+            } else {
+                queue.add(runnable);
+            }
+        }
+
+        private void checkQueue() {
+            Runnable runnable;
+            while ((runnable = queue.poll()) != null) {
+                handler.post(runnable);
+            }
         }
 
         public void quit() {
