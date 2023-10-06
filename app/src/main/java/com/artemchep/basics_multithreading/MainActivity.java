@@ -1,6 +1,8 @@
 package com.artemchep.basics_multithreading;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 
 import androidx.annotation.UiThread;
@@ -21,18 +23,26 @@ public class MainActivity extends AppCompatActivity {
     private List<WithMillis<Message>> mList = new ArrayList<>();
 
     private MessageAdapter mAdapter = new MessageAdapter(mList);
-
+    private LooperThread looperThread = new LooperThread();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        looperThread.start();
+
         final RecyclerView recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(mAdapter);
 
         showWelcomeDialog();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        looperThread.quit();
     }
 
     private void showWelcomeDialog() {
@@ -54,22 +64,25 @@ public class MainActivity extends AppCompatActivity {
     public void insert(final WithMillis<Message> message) {
         mList.add(message);
         mAdapter.notifyItemInserted(mList.size() - 1);
-        new Thread(new Runnable() {
+        looperThread.handler.post(new Runnable() {
             @Override
             public void run() {
-                long timestamp = System.currentTimeMillis();
-                final String cipherText = CipherUtil.encrypt(message.value.plainText);
-                long diff = System.currentTimeMillis() - timestamp;
-                final Message messageNew = message.value.copy(cipherText);
-                final WithMillis<Message> messageNewWithMillis = new WithMillis<>(messageNew, diff);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        update(messageNewWithMillis);
-                    }
-                });
+                synchronized (MainActivity.this) {
+                    if (looperThread.isQuit()) return;
+                    long timestamp = System.currentTimeMillis();
+                    final String cipherText = CipherUtil.encrypt(message.value.plainText);
+                    long diff = System.currentTimeMillis() - timestamp;
+                    final Message messageNew = message.value.copy(cipherText);
+                    final WithMillis<Message> messageNewWithMillis = new WithMillis<>(messageNew, diff);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            update(messageNewWithMillis);
+                        }
+                    });
+                }
             }
-        }).start();
+        });
     }
 
     @UiThread
@@ -85,4 +98,26 @@ public class MainActivity extends AppCompatActivity {
         throw new IllegalStateException();
     }
 
+    private static class LooperThread extends Thread {
+        public Handler handler;
+        private Looper looper;
+        private boolean quit;
+
+        @Override
+        public void run() {
+            Looper.prepare();
+            looper = Looper.myLooper();
+            handler = new Handler(looper);
+            Looper.loop();
+        }
+
+        public void quit() {
+            looper.quit();
+            quit = true;
+        }
+
+        public boolean isQuit() {
+            return quit;
+        }
+    }
 }
